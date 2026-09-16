@@ -1,374 +1,271 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMORPH</title>
 
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #181818;
-        color: white;
-        text-align: center;
-        padding: 30px;
-    }
+body {
+    margin: 0;
+    background: #111;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
 
-    canvas {
-        display: block;
-        max-width: 90%;
-        max-height: 600px;
-        margin: 25px auto;
-        border: 2px solid white;
-    }
+h1 {
+    font-size: 48px;
+    margin-bottom: 5px;
+}
 
-    button,
-    input {
-        margin: 8px;
-        padding: 10px;
-    }
+p {
+    color: #aaa;
+}
 
-    button {
-        cursor: pointer;
-    }
+button, label {
+    background: #5865f2;
+    color: white;
+    border: 0;
+    padding: 14px 22px;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    display: inline-block;
+    margin: 8px;
+}
 
-    #status {
-        margin: 15px;
-    }
+button:hover, label:hover {
+    background: #7280ff;
+}
+
+input {
+    display: none;
+}
+
+canvas {
+    max-width: 80%;
+    max-height: 65vh;
+    margin-top: 20px;
+    border-radius: 12px;
+    box-shadow: 0 0 30px #000;
+}
+
+#info {
+    margin-top: 15px;
+    color: #aaa;
+}
 </style>
 </head>
 
 <body>
 
 <h1>IMORPH</h1>
+<p>An image that changes every time you open it.</p>
 
-<p>Turn an image into an IMORPH file.</p>
+<label>
+    Create IMORPH
+    <input type="file" id="create" accept="image/*">
+</label>
 
-<input id="imageInput" type="file" accept="image/*">
+<label>
+    Open IMORPH
+    <input type="file" id="open" accept=".imorph,.json">
+</label>
 
 <br>
 
-<input id="imorphInput" type="file" accept=".imorph">
+<button id="download" style="display:none;">
+    Save This Generation
+</button>
 
-<br>
-
-<button id="morphButton">Morph</button>
-<button id="saveButton">Save .imorph</button>
-
-<p id="generation">Generation: 0</p>
-<p id="status"></p>
+<div id="info"></div>
 
 <canvas id="canvas"></canvas>
 
-
 <script>
-
-const imageInput = document.getElementById("imageInput");
-const imorphInput = document.getElementById("imorphInput");
-const morphButton = document.getElementById("morphButton");
-const saveButton = document.getElementById("saveButton");
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-const generationText = document.getElementById("generation");
-const statusText = document.getElementById("status");
-
-let generation = 0;
-let loaded = false;
+let currentData = null;
 
 
-// -----------------------------
-// LOAD NORMAL IMAGE
-// -----------------------------
+// =============================
+// CREATE IMORPH
+// =============================
 
-imageInput.addEventListener("change", function () {
+document.getElementById("create").addEventListener("change", async e => {
 
-    const file = this.files[0];
+    const file = e.target.files[0];
 
     if (!file) return;
 
     const reader = new FileReader();
 
-    reader.onload = function () {
+    reader.onload = () => {
 
-        const img = new Image();
-
-        img.onload = function () {
-
-            canvas.width = img.width;
-            canvas.height = img.height;
-
-            ctx.clearRect(
-                0,
-                0,
-                canvas.width,
-                canvas.height
-            );
-
-            ctx.drawImage(img, 0, 0);
-
-            generation = 0;
-            loaded = true;
-
-            updateGeneration();
-
-            statusText.textContent =
-                "Image loaded successfully.";
-
+        currentData = {
+            format: "IMORPH",
+            version: 1,
+            generation: 0,
+            image: reader.result
         };
 
-        img.src = reader.result;
+        showMorph();
+
     };
 
     reader.readAsDataURL(file);
 });
 
 
-// -----------------------------
-// LOAD .IMORPH
-// -----------------------------
+// =============================
+// OPEN IMORPH
+// =============================
 
-imorphInput.addEventListener("change", function () {
+document.getElementById("open").addEventListener("change", async e => {
 
-    const file = this.files[0];
+    const file = e.target.files[0];
 
     if (!file) return;
 
-    const reader = new FileReader();
+    const text = await file.text();
 
-    reader.onload = function () {
+    try {
 
-        try {
+        currentData = JSON.parse(text);
 
-            const data =
-                JSON.parse(reader.result);
-
-            if (data.format !== "IMORPH") {
-
-                throw new Error(
-                    "Not an IMORPH file"
-                );
-            }
-
-            const img = new Image();
-
-            img.onload = function () {
-
-                canvas.width =
-                    img.width;
-
-                canvas.height =
-                    img.height;
-
-                ctx.clearRect(
-                    0,
-                    0,
-                    canvas.width,
-                    canvas.height
-                );
-
-                ctx.drawImage(
-                    img,
-                    0,
-                    0
-                );
-
-                generation =
-                    Number(data.generation) || 0;
-
-                loaded = true;
-
-                updateGeneration();
-
-                statusText.textContent =
-                    "IMORPH file loaded.";
-
-            };
-
-            img.src = data.image;
-
-        } catch (error) {
-
-            console.error(error);
-
-            statusText.textContent =
-                "That file is not a valid IMORPH file.";
+        if (currentData.format !== "IMORPH") {
+            alert("That isn't an IMORPH file.");
+            return;
         }
-    };
 
-    reader.readAsText(file);
+        showMorph();
+
+    } catch {
+
+        alert("Invalid IMORPH file.");
+
+    }
+
 });
 
 
-// -----------------------------
+// =============================
 // MORPH
-// -----------------------------
+// =============================
 
-morphButton.addEventListener("click", function () {
+function showMorph() {
 
-    if (!loaded) {
+    const img = new Image();
 
-        statusText.textContent =
-            "Load an image first.";
+    img.onload = () => {
 
-        return;
-    }
+        canvas.width = img.width;
+        canvas.height = img.height;
 
-    const imageData =
-        ctx.getImageData(
+        ctx.drawImage(img, 0, 0);
+
+        let image = ctx.getImageData(
             0,
             0,
             canvas.width,
             canvas.height
         );
 
-    const pixels =
-        imageData.data;
+        const pixels = image.data;
 
-    generation++;
+        const generation =
+            (currentData.generation || 0) + 1;
 
-    /*
-        Make a small random mutation
-        to the image.
-    */
+        // Different mutation every generation
+        const strength =
+            Math.min(35, 5 + generation * 2);
 
-    for (
-        let i = 0;
-        i < pixels.length;
-        i += 4
-    ) {
+        for (let i = 0; i < pixels.length; i += 4) {
 
-        if (Math.random() > 0.03) {
-            continue;
+            // Slowly alter colours
+            pixels[i] =
+                Math.max(0,
+                Math.min(255,
+                pixels[i] +
+                random(-strength, strength)));
+
+            pixels[i + 1] =
+                Math.max(0,
+                Math.min(255,
+                pixels[i + 1] +
+                random(-strength, strength)));
+
+            pixels[i + 2] =
+                Math.max(0,
+                Math.min(255,
+                pixels[i + 2] +
+                random(-strength, strength)));
+
         }
 
-        pixels[i] =
-            Math.max(
-                0,
-                Math.min(
-                    255,
-                    pixels[i] +
-                    Math.floor(
-                        Math.random() * 21 - 10
-                    )
-                )
-            );
+        ctx.putImageData(image, 0, 0);
 
-        pixels[i + 1] =
-            Math.max(
-                0,
-                Math.min(
-                    255,
-                    pixels[i + 1] +
-                    Math.floor(
-                        Math.random() * 21 - 10
-                    )
-                )
-            );
+        // Store the new generation
+        currentData.generation = generation;
 
-        pixels[i + 2] =
-            Math.max(
-                0,
-                Math.min(
-                    255,
-                    pixels[i + 2] +
-                    Math.floor(
-                        Math.random() * 21 - 10
-                    )
-                )
-            );
-    }
+        currentData.image =
+            canvas.toDataURL("image/png");
 
-    ctx.putImageData(
-        imageData,
-        0,
-        0
-    );
+        document.getElementById("info").textContent =
+            "Generation " + generation;
 
-    updateGeneration();
-
-    statusText.textContent =
-        "Image morphed.";
-
-});
-
-
-// -----------------------------
-// SAVE .IMORPH
-// -----------------------------
-
-saveButton.addEventListener("click", function () {
-
-    if (!loaded) {
-
-        statusText.textContent =
-            "Load an image first.";
-
-        return;
-    }
-
-    const image =
-        canvas.toDataURL("image/png");
-
-    const data = {
-
-        format: "IMORPH",
-
-        version: 1,
-
-        generation: generation,
-
-        image: image
+        document.getElementById("download").style.display =
+            "inline-block";
 
     };
 
-    const text =
-        JSON.stringify(data);
+    img.src = currentData.image;
 
-    const blob =
-        new Blob(
-            [text],
-            {
-                type: "application/octet-stream"
-            }
-        );
+}
 
-    const url =
-        URL.createObjectURL(blob);
 
-    const link =
-        document.createElement("a");
+// =============================
+// RANDOM
+// =============================
 
-    link.href = url;
+function random(min, max) {
 
-    link.download =
-        "image.imorph";
+    return Math.floor(
+        Math.random() * (max - min + 1)
+    ) + min;
 
-    document.body.appendChild(link);
+}
 
-    link.click();
 
-    link.remove();
+// =============================
+// SAVE
+// =============================
+
+document.getElementById("download").onclick = () => {
+
+    const blob = new Blob(
+        [JSON.stringify(currentData)],
+        { type: "application/json" }
+    );
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+
+    a.href = url;
+
+    a.download =
+        "generation-" +
+        currentData.generation +
+        ".imorph";
+
+    a.click();
 
     URL.revokeObjectURL(url);
 
-    statusText.textContent =
-        "IMORPH file downloaded.";
-
-});
-
-
-// -----------------------------
-// UPDATE GENERATION
-// -----------------------------
-
-function updateGeneration() {
-
-    generationText.textContent =
-        "Generation: " +
-        generation;
-}
+};
 
 </script>
 
